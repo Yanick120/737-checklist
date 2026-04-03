@@ -300,10 +300,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'SF Pro
     color: var(--text-muted); cursor: pointer; white-space: nowrap;
     transition: background .12s, color .12s, border-color .12s;
 }
-.fcom-ch-btn.active {
-    background: var(--primary); color: #fff;
-    border-color: var(--primary);
-}
+.fcom-ch-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 #fcom-sub {
     display: flex; gap: 5px; padding: 7px 12px;
     overflow-x: auto; background: var(--bg);
@@ -317,10 +314,35 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'SF Pro
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 14px; font-size: 11px; font-weight: 500;
     color: var(--text-muted); cursor: pointer; white-space: nowrap;
-    transition: background .12s, color .12s;
 }
 .fcom-sub-btn.active { background: rgba(26,111,196,.1); color: var(--primary); border-color: rgba(26,111,196,.3); }
-#fcom-frame { flex: 1; width: 100%; border: none; background: #fff; }
+#fcom-viewer {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    background: #525659; display: flex; flex-direction: column;
+    align-items: center; padding: 10px; gap: 0;
+    -webkit-overflow-scrolling: touch;
+}
+#fcom-loading {
+    color: #ccc; font-size: 14px; padding: 40px;
+    display: none;
+}
+#fcom-loading.visible { display: block; }
+#fcom-canvas { max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.5); display: block; }
+#fcom-nav {
+    display: flex; align-items: center; justify-content: center;
+    gap: 20px; padding: 10px 16px; background: var(--surface);
+    border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.fcom-nav-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--primary); color: #fff; border: none;
+    font-size: 24px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: background .12s;
+}
+.fcom-nav-btn:active { background: var(--primary-dark); }
+.fcom-nav-btn:disabled { background: var(--border); color: var(--text-muted); cursor: default; }
+#fcom-page-info { font-size: 14px; font-weight: 600; color: var(--text-muted); min-width: 80px; text-align: center; font-variant-numeric: tabular-nums; }
 
 /* ═══════════════════════════════════════
    MANAGE FLIGHT SCREEN
@@ -805,6 +827,7 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'SF Pro
     .cl-response { font-size: 16px; }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -1064,7 +1087,15 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'SF Pro
         <div id="view-fcom" class="view hidden">
             <div id="fcom-chapters"></div>
             <div id="fcom-sub" class="hidden"></div>
-            <iframe id="fcom-frame" src=""></iframe>
+            <div id="fcom-viewer">
+                <div id="fcom-loading">Wird geladen…</div>
+                <canvas id="fcom-canvas"></canvas>
+            </div>
+            <div id="fcom-nav">
+                <button class="fcom-nav-btn" id="fcom-prev">&#8249;</button>
+                <span id="fcom-page-info">— / —</span>
+                <button class="fcom-nav-btn" id="fcom-next">&#8250;</button>
+            </div>
         </div>
 
         <!-- Performance View -->
@@ -2409,16 +2440,29 @@ setInterval(function() {
 }, 60000);
 
 function openNavigraph(icao) {
-    var webUrl = 'https://charts.navigraph.com' + (icao ? '/?icao=' + icao : '');
     var appUrl = 'navigraph://charts' + (icao ? '?icao=' + icao : '');
-    // Try app first via URL scheme; fall back to web after 1.5s
-    var fallback = setTimeout(function() { window.open(webUrl, '_blank'); }, 1500);
-    var iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = appUrl;
-    iframe.onload = function() { clearTimeout(fallback); };
-    document.body.appendChild(iframe);
-    setTimeout(function() { document.body.removeChild(iframe); }, 2000);
+    var webUrl = 'https://charts.navigraph.com' + (icao ? '/?icao=' + icao : '');
+
+    // iOS/iPadOS: window.location.href is the only reliable way to trigger
+    // custom URL schemes from a PWA. If the app isn't installed, the navigation
+    // fails silently and the fallback timer opens the web version instead.
+    var start = Date.now();
+    var didHide = false;
+
+    function onHide() {
+        didHide = true; // app opened, page went to background
+        document.removeEventListener('visibilitychange', onHide);
+    }
+    document.addEventListener('visibilitychange', onHide);
+
+    setTimeout(function() {
+        document.removeEventListener('visibilitychange', onHide);
+        if (!didHide && Date.now() - start < 3000) {
+            window.location.href = webUrl; // fallback: open web version
+        }
+    }, 1500);
+
+    window.location.href = appUrl;
 }
 
 function loadSimBrief() {
@@ -2667,50 +2711,51 @@ document.getElementById('view-archive').classList.toggle('hidden', view !== 'arc
 // ─── FCOM ──────────────────────────────────────────────
 var FCOM_PDF = 'ryanair-737-700-800-fcom-rev-30.pdf';
 var FCOM_CHAPTERS = [
-    { title: 'Preface',         page: 3  },
-    { title: 'Limitations',     page: 29, sub: [
+    { title: 'Preface',        page: 3  },
+    { title: 'Limitations',   page: 29, sub: [
         { title: '10 Operating Limitations', page: 29 },
         { title: '40 Standard Callouts',     page: 28 },
     ]},
-    { title: 'Normal Proc.',    page: 31, sub: [
-        { title: 'Normal Procedures',        page: 31 },
-        { title: '21 Amplified Procedures',  page: 33 },
+    { title: 'Normal Proc.',  page: 31, sub: [
+        { title: 'Normal Procedures',       page: 31 },
+        { title: '21 Amplified Proc.',      page: 33 },
     ]},
-    { title: 'Suppl. Proc.',    page: 35, sub: [
-        { title: 'Supplementary',            page: 35 },
-        { title: '16 Adverse Weather',       page: 49 },
+    { title: 'Suppl. Proc.', page: 35, sub: [
+        { title: 'Supplementary',           page: 35 },
+        { title: '16 Adverse Weather',      page: 49 },
     ]},
-    { title: 'Perf. Dispatch',  page: 50 },
-    { title: 'Perf. Inflight',  page: 78 },
-    { title: 'Systems',         page: 138, sub: [
-        { title: '1 Airplane General',       page: 138 },
-        { title: '2 Air Systems',            page: 148 },
-        { title: '3 Anti-Ice / Rain',        page: 154 },
-        { title: '4 Automatic Flight',       page: 157 },
-        { title: '5 Communications',         page: 160 },
-        { title: '6 Electrical',             page: 163 },
-        { title: '7 Engines / APU',          page: 166 },
-        { title: '8 Fire Protection',        page: 171 },
-        { title: '9 Flight Controls',        page: 174 },
-        { title: '10 Flight Instruments',    page: 177 },
-        { title: '11 FMS / Navigation',      page: 183 },
-        { title: '12 Fuel',                  page: 194 },
-        { title: '13 Hydraulics',            page: 197 },
-        { title: '14 Landing Gear',          page: 200 },
-        { title: '15 Warning Systems',       page: 203 },
+    { title: 'Perf. Dispatch', page: 50 },
+    { title: 'Perf. Inflight', page: 78 },
+    { title: 'Systems',       page: 138, sub: [
+        { title: '1 Airplane General',      page: 138 },
+        { title: '2 Air Systems',           page: 148 },
+        { title: '3 Anti-Ice / Rain',       page: 154 },
+        { title: '4 Automatic Flight',      page: 157 },
+        { title: '5 Communications',        page: 160 },
+        { title: '6 Electrical',            page: 163 },
+        { title: '7 Engines / APU',         page: 166 },
+        { title: '8 Fire Protection',       page: 171 },
+        { title: '9 Flight Controls',       page: 174 },
+        { title: '10 Flight Instruments',   page: 177 },
+        { title: '11 FMS / Navigation',     page: 183 },
+        { title: '12 Fuel',                 page: 194 },
+        { title: '13 Hydraulics',           page: 197 },
+        { title: '14 Landing Gear',         page: 200 },
+        { title: '15 Warning Systems',      page: 203 },
     ]},
 ];
 var _fcomChapterIdx = 0;
+var _fcomPdfDoc    = null;
+var _fcomPageNum   = 1;
+var _fcomRendering = false;
+var _fcomPending   = null;
 
 function renderFCOM() {
-    var chapEl = document.getElementById('fcom-chapters');
-    var subEl  = document.getElementById('fcom-sub');
-
-    chapEl.innerHTML = FCOM_CHAPTERS.map(function(ch, i) {
+    document.getElementById('fcom-chapters').innerHTML = FCOM_CHAPTERS.map(function(ch, i) {
         return '<button class="fcom-ch-btn' + (i === _fcomChapterIdx ? ' active' : '') + '" data-fcom-ch="' + i + '">' + ch.title + '</button>';
     }).join('');
-
     renderFCOMSub();
+    if (!_fcomPdfDoc) initFCOMPdf();
 }
 
 function renderFCOMSub() {
@@ -2728,18 +2773,66 @@ function renderFCOMSub() {
     setFCOMPage(ch.sub[0].page);
 }
 
+function initFCOMPdf() {
+    if (typeof pdfjsLib === 'undefined') return;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    document.getElementById('fcom-loading').classList.add('visible');
+    pdfjsLib.getDocument(FCOM_PDF).promise.then(function(pdf) {
+        _fcomPdfDoc = pdf;
+        document.getElementById('fcom-loading').classList.remove('visible');
+        renderFCOMCanvas(_fcomPageNum);
+    }).catch(function() {
+        document.getElementById('fcom-loading').textContent = 'PDF konnte nicht geladen werden.';
+    });
+}
+
 function setFCOMPage(page) {
-    var frame = document.getElementById('fcom-frame');
-    frame.src = FCOM_PDF + '#page=' + page;
+    _fcomPageNum = Math.max(1, page);
+    if (_fcomPdfDoc) renderFCOMCanvas(_fcomPageNum);
+}
+
+function renderFCOMCanvas(num) {
+    if (!_fcomPdfDoc) return;
+    num = Math.max(1, Math.min(num, _fcomPdfDoc.numPages));
+    _fcomPageNum = num;
+    updateFCOMNav();
+    if (_fcomRendering) { _fcomPending = num; return; }
+    _fcomRendering = true;
+    _fcomPdfDoc.getPage(num).then(function(page) {
+        var canvas = document.getElementById('fcom-canvas');
+        var ctx    = canvas.getContext('2d');
+        var dpr    = window.devicePixelRatio || 1;
+        var displayW = document.getElementById('fcom-viewer').clientWidth - 20;
+        var baseVP   = page.getViewport({ scale: 1 });
+        var scale    = displayW / baseVP.width;
+        var vp       = page.getViewport({ scale: scale * dpr });
+        canvas.width  = vp.width;
+        canvas.height = vp.height;
+        canvas.style.width  = displayW + 'px';
+        canvas.style.height = Math.round(displayW * baseVP.height / baseVP.width) + 'px';
+        return page.render({ canvasContext: ctx, viewport: vp }).promise;
+    }).then(function() {
+        _fcomRendering = false;
+        document.getElementById('fcom-viewer').scrollTop = 0;
+        if (_fcomPending !== null) {
+            var p = _fcomPending; _fcomPending = null;
+            renderFCOMCanvas(p);
+        }
+    });
+}
+
+function updateFCOMNav() {
+    var total = _fcomPdfDoc ? _fcomPdfDoc.numPages : 0;
+    document.getElementById('fcom-page-info').textContent = _fcomPageNum + ' / ' + (total || '—');
+    document.getElementById('fcom-prev').disabled = _fcomPageNum <= 1;
+    document.getElementById('fcom-next').disabled = total > 0 && _fcomPageNum >= total;
 }
 
 document.getElementById('fcom-chapters').addEventListener('click', function(e) {
     var btn = e.target.closest('[data-fcom-ch]');
     if (!btn) return;
     _fcomChapterIdx = parseInt(btn.dataset.fcomCh);
-    document.querySelectorAll('.fcom-ch-btn').forEach(function(b) {
-        b.classList.toggle('active', b === btn);
-    });
+    document.querySelectorAll('.fcom-ch-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
     document.querySelectorAll('.fcom-sub-btn').forEach(function(b) { b.classList.remove('active'); });
     renderFCOMSub();
 });
@@ -2752,6 +2845,9 @@ document.getElementById('fcom-sub').addEventListener('click', function(e) {
     btn.classList.add('active');
     setFCOMPage(FCOM_CHAPTERS[_fcomChapterIdx].sub[idx].page);
 });
+
+document.getElementById('fcom-prev').addEventListener('click', function() { renderFCOMCanvas(_fcomPageNum - 1); });
+document.getElementById('fcom-next').addEventListener('click', function() { renderFCOMCanvas(_fcomPageNum + 1); });
 
 // ─── Checklist Nav ─────────────────────────────────────
 function renderNav() {
