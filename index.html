@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>737 Checklist</title>
+<style>
+:root {
+    --sidebar-w: 300px; --header-h: 64px; --footer-h: 88px;
+    --bg: #f0f2f5; --surface: #fff; --border: #e2e5ea;
+    --sidebar-bg: #0d1b2e; --sidebar-text: #8a9bb5; --sidebar-active: #1e3a5f; --phase-label: #4a6080;
+    --primary: #1a6fc4; --primary-dark: #1258a0;
+    --success: #16a34a; --success-bg: #f0fdf4;
+    --text: #1a202c; --text-muted: #64748b; --text-dim: #94a3b8;
+    --item-h: 68px; --radius: 12px; --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); }
+
+/* ═══════════════════════════════════════
+   HOME SCREEN
+═══════════════════════════════════════ */
+#screen-home {
+    position: fixed; inset: 0; z-index: 50;
+    background: var(--sidebar-bg);
+    display: flex; flex-direction: column;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+#screen-home.hidden { display: none; }
+
+.home-top {
+    padding: 52px 32px 28px;
+    background: linear-gradient(180deg, #0d1b2e 0%, #0f2240 100%);
+    flex-shrink: 0;
+}
+.home-brand { font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .14em; margin-bottom: 4px; }
+.home-title { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -.5px; line-height: 1.1; }
+.home-sub { font-size: 14px; color: var(--sidebar-text); margin-top: 4px; letter-spacing: .04em; }
+
+/* Flight info card on home */
+.home-flight-card {
+    margin: 0 20px;
+    margin-top: -1px;
+    background: rgba(26,111,196,.15);
+    border: 1px solid rgba(26,111,196,.35);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    display: flex; align-items: center; gap: 16px;
+}
+.home-flight-card.hidden { display: none; }
+.home-flight-icon { font-size: 28px; }
+.home-flight-info { flex: 1; }
+.home-flight-fn { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: .06em; }
+.home-flight-meta { font-size: 13px; color: #7eb8f7; margin-top: 2px; }
+.home-flight-progress { font-size: 12px; color: var(--sidebar-text); margin-top: 4px; }
+
+/* No flight placeholder */
+.home-no-flight {
+    margin: 0 20px;
+    padding: 20px;
+    border: 1px dashed rgba(255,255,255,.12);
+    border-radius: var(--radius);
+    text-align: center;
+    color: var(--sidebar-text);
+    font-size: 14px;
+    line-height: 1.5;
+}
+.home-no-flight.hidden { display: none; }
+
+/* Nav grid */
+.home-nav { padding: 20px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+.home-nav-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.home-card {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+    display: flex; flex-direction: column; gap: 10px;
+    -webkit-user-select: none; user-select: none;
+}
+.home-card:active { background: rgba(255,255,255,.12); transform: scale(.98); }
+.home-card.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; padding: 18px 20px; }
+.home-card.primary-card { background: rgba(26,111,196,.2); border-color: rgba(26,111,196,.4); }
+.home-card.primary-card:active { background: rgba(26,111,196,.3); }
+.home-card-icon { font-size: 28px; line-height: 1; }
+.home-card-title { font-size: 15px; font-weight: 700; color: #fff; }
+.home-card-desc { font-size: 12px; color: var(--sidebar-text); line-height: 1.4; }
+.home-card.wide .home-card-icon { font-size: 24px; }
+.home-card.wide .home-card-body { flex: 1; }
+.home-card-arrow { font-size: 18px; color: var(--sidebar-text); margin-left: auto; }
+
+/* Checklist mini progress bar on home card */
+.home-cl-bar { height: 3px; background: rgba(255,255,255,.1); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.home-cl-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width .4s; }
+.home-cl-bar-fill.done { background: var(--success); }
+
+.home-new-flight-btn {
+    margin: 4px 20px 32px;
+    padding: 14px;
+    background: none;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: var(--radius);
+    color: var(--sidebar-text);
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; text-align: center;
+    transition: background .15s, color .15s;
+}
+.home-new-flight-btn:active { background: rgba(255,255,255,.08); color: #fff; }
+
+/* ═══════════════════════════════════════
+   APP SCREEN (Checklist / Wartung / Archiv)
+═══════════════════════════════════════ */
+#screen-app { display: flex; height: 100vh; overflow: hidden; }
+#screen-app.hidden { display: none; }
+
+/* Sidebar */
+#sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--sidebar-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; z-index: 100; }
+#sidebar-header { padding: 24px 20px 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+#sidebar-title { font-size: 18px; font-weight: 700; color: #fff; }
+#sidebar-sub { font-size: 11px; color: var(--sidebar-text); margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
+#sidebar-flight { font-size: 13px; font-weight: 700; color: #7eb8f7; margin-top: 8px; letter-spacing: .04em; }
+#checklist-nav { flex: 1; overflow-y: auto; padding: 10px 0 16px; -webkit-overflow-scrolling: touch; }
+#checklist-nav::-webkit-scrollbar { width: 4px; }
+#checklist-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+.phase-group { margin-bottom: 6px; }
+.phase-label { font-size: 10px; font-weight: 700; color: var(--phase-label); text-transform: uppercase; letter-spacing: .1em; padding: 12px 20px 5px; }
+.nav-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 16px 11px 20px; background: none; border: none; color: var(--sidebar-text); font-size: 15px; text-align: left; cursor: pointer; position: relative; min-height: 46px; transition: background .12s, color .12s; }
+.nav-item:active { background: var(--sidebar-active); }
+.nav-item.active { background: var(--sidebar-active); color: #fff; border-left: 3px solid var(--primary); }
+.nav-item.done { color: var(--success); }
+.nav-item.done.active { background: rgba(22,163,74,.15); border-left-color: var(--success); }
+.nav-status { font-size: 11px; font-weight: 600; color: inherit; width: 28px; flex-shrink: 0; text-align: center; }
+.nav-name { flex: 1; font-weight: 500; }
+.nav-progress { position: absolute; bottom: 0; left: 20px; right: 16px; height: 2px; background: rgba(255,255,255,.08); border-radius: 1px; overflow: hidden; }
+.nav-progress div { height: 100%; background: var(--primary); border-radius: 1px; transition: width .3s; }
+
+/* Main */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow: hidden; }
+#main-header { height: var(--header-h); display: flex; align-items: center; gap: 10px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#btn-home { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+#btn-home:active { background: var(--bg); }
+#btn-menu { display: none; width: 36px; height: 36px; background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; border-radius: 8px; align-items: center; justify-content: center; }
+#btn-menu:active { background: var(--bg); }
+#header-title-wrap { flex: 1; min-width: 0; }
+#header-title { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#header-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+#btn-header-action { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--border); border-radius: 8px; font-size: 18px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; }
+#btn-header-action:active { background: var(--bg); }
+#btn-header-action.hidden { visibility: hidden; }
+
+/* Views */
+.view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.view.hidden { display: none !important; }
+
+/* Checklist */
+#checklist-body { flex: 1; overflow-y: auto; padding: 16px 20px; -webkit-overflow-scrolling: touch; position: relative; }
+#checklist-footer { height: var(--footer-h); padding: 12px 20px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+#checklist-footer.hidden { display: none; }
+#progress-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+#progress-bar { height: 100%; background: var(--primary); border-radius: 2px; transition: width .3s; }
+#btn-complete { flex: 1; background: var(--border); color: var(--text-muted); border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600; cursor: not-allowed; transition: background .2s, color .2s; }
+#btn-complete.ready { background: var(--primary); color: #fff; cursor: pointer; box-shadow: 0 2px 12px rgba(26,111,196,.35); }
+#btn-complete.ready:active { background: var(--primary-dark); }
+.cl-item { display: flex; align-items: center; gap: 16px; min-height: var(--item-h); padding: 14px 16px; background: var(--surface); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; border: 1.5px solid var(--border); transition: border-color .15s, background .15s; user-select: none; -webkit-user-select: none; }
+.cl-item:active { background: #f8fafc; }
+.cl-item.checked { background: var(--success-bg); border-color: #bbf7d0; }
+.cl-item.locked { cursor: default; }
+.cl-checkbox { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s; background: #fff; }
+.cl-checkbox.checked { background: var(--success); border-color: var(--success); }
+.cl-checkbox svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.cl-texts { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cl-challenge { font-size: 16px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: .03em; }
+.cl-item.checked .cl-challenge { color: var(--success); }
+.cl-response { font-size: 15px; font-weight: 500; color: var(--primary); text-align: right; flex-shrink: 0; max-width: 55%; }
+.cl-item.checked .cl-response { color: var(--success); }
+#completed-overlay { position: absolute; inset: 0; background: rgba(240,253,244,.92); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.completed-badge { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.completed-check { width: 80px; height: 80px; background: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; color: #fff; box-shadow: 0 4px 24px rgba(22,163,74,.4); }
+.completed-title { font-size: 22px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .05em; }
+.completed-sub { font-size: 14px; color: var(--success); font-weight: 600; text-transform: uppercase; }
+
+/* Maintenance */
+#view-maintenance { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px 40px; background: var(--bg); }
+.maint-section { margin-bottom: 14px; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.maint-section-title { padding: 9px 16px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+.maint-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 12px; }
+.maint-row:last-child { border-bottom: none; }
+.maint-label { font-size: 13px; color: var(--text-muted); width: 140px; flex-shrink: 0; font-weight: 500; }
+.maint-input { flex: 1; border: none; outline: none; font-size: 15px; font-weight: 500; color: var(--text); background: transparent; font-family: inherit; }
+.maint-input:focus { color: var(--primary); }
+.maint-input[readonly] { color: var(--text-muted); }
+.maint-textarea { flex: 1; border: none; outline: none; font-size: 14px; color: var(--text); background: transparent; resize: none; min-height: 72px; font-family: inherit; line-height: 1.5; }
+#maint-saved { text-align: center; padding: 8px; font-size: 12px; color: var(--success); opacity: 0; transition: opacity .3s; }
+#maint-saved.show { opacity: 1; }
+
+/* Archive */
+#view-archive { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 20px 40px; background: var(--bg); }
+.archive-empty { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 15px; line-height: 1.6; }
+.archive-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+.archive-card.is-current { border-color: var(--primary); }
+.archive-card-top { padding: 14px 16px 10px; cursor: pointer; }
+.archive-row1 { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.archive-fn { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: .04em; }
+.archive-cur-badge { font-size: 10px; font-weight: 700; color: var(--primary); background: rgba(26,111,196,.1); padding: 2px 8px; border-radius: 10px; }
+.archive-date { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.archive-row2 { font-size: 13px; color: var(--text-muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.archive-row3 { margin-top: 6px; font-size: 12px; color: var(--text-dim); }
+.archive-detail { display: none; border-top: 1px solid var(--border); padding: 14px 16px; background: var(--bg); }
+.archive-detail.open { display: block; }
+.archive-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+.archive-detail-cell { display: flex; flex-direction: column; gap: 2px; }
+.archive-detail-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; }
+.archive-detail-val { font-size: 13px; font-weight: 500; color: var(--text); }
+.archive-remarks { margin-top: 12px; font-size: 13px; color: var(--text); line-height: 1.5; }
+.archive-remarks-lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.archive-delete-btn { display: block; width: 100%; margin-top: 14px; padding: 8px; background: none; border: 1px solid #fecaca; color: #dc2626; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; text-align: center; }
+.archive-delete-btn:active { background: #fef2f2; }
+
+/* ═══════════════════════════════════════
+   FLIGHT MODAL
+═══════════════════════════════════════ */
+#flight-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 300; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+#flight-modal.visible { display: flex; }
+#modal-box { background: var(--surface); border-radius: 20px; padding: 32px 28px; width: 360px; max-width: 92vw; box-shadow: 0 24px 64px rgba(0,0,0,.4); }
+.modal-eyebrow { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 4px; }
+.modal-title { font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 24px; }
+#modal-continue-btn { width: 100%; padding: 14px 16px; background: rgba(26,111,196,.06); border: 1.5px solid rgba(26,111,196,.25); border-radius: var(--radius); font-size: 15px; font-weight: 600; color: var(--primary); cursor: pointer; margin-bottom: 16px; text-align: left; display: flex; align-items: center; gap: 12px; }
+#modal-continue-btn:active { background: rgba(26,111,196,.14); }
+#modal-continue-fn { font-size: 20px; font-weight: 800; letter-spacing: .04em; }
+.modal-continue-sub { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.modal-arrow { margin-left: auto; }
+.modal-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; font-size: 12px; color: var(--text-dim); }
+.modal-divider::before, .modal-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+#modal-input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 18px; font-weight: 700; color: var(--text); outline: none; font-family: inherit; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 12px; transition: border-color .15s; }
+#modal-input:focus { border-color: var(--primary); }
+#modal-start-btn { width: 100%; padding: 16px; background: var(--primary); color: #fff; border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600; cursor: pointer; }
+#modal-start-btn:active { background: var(--primary-dark); }
+
+/* Sidebar overlay (mobile) */
+#sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
+#sidebar-overlay.visible { display: block; }
+
+/* ═══════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════ */
+@media (max-width: 899px) {
+    #sidebar { position: fixed; left: calc(-1 * var(--sidebar-w)); transition: left .25s cubic-bezier(.4,0,.2,1); }
+    #sidebar.open { left: 0; }
+    #btn-menu { display: flex; }
+    .cl-texts { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .cl-response { max-width: 100%; text-align: left; }
+    .maint-label { width: 110px; }
+    .archive-detail-grid { grid-template-columns: 1fr; }
+    .home-top { padding: 40px 24px 24px; }
+    .home-flight-card, .home-no-flight { margin: 0 16px; }
+    .home-nav { padding: 16px; }
+}
+@media (min-width: 900px) { #btn-menu { display: none; } }
+@media (min-width: 1024px) {
+    :root { --item-h: 72px; }
+    .cl-challenge { font-size: 17px; }
+    .cl-response { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HOME SCREEN ═══ -->
+<div id="screen-home">
+    <div class="home-top">
+        <div class="home-brand">Boeing 737 NG</div>
+        <div class="home-title">Normal<br>Procedures</div>
+        <div class="home-sub">FOR TRAINING PURPOSES ONLY</div>
+    </div>
+
+    <!-- Active flight card -->
+    <div class="home-flight-card hidden" id="home-flight-card">
+        <div class="home-flight-icon">&#9992;</div>
+        <div class="home-flight-info">
+            <div class="home-flight-fn" id="home-fn"></div>
+            <div class="home-flight-meta" id="home-meta"></div>
+            <div class="home-flight-progress" id="home-progress"></div>
+        </div>
+    </div>
+    <div class="home-no-flight" id="home-no-flight">
+        Kein aktiver Flug.<br>Starte einen neuen Flug um zu beginnen.
+    </div>
+
+    <div class="home-nav">
+        <div class="home-nav-row">
+            <!-- Checklisten -->
+            <div class="home-card primary-card" data-goto="checklist">
+                <div class="home-card-icon">&#10003;</div>
+                <div>
+                    <div class="home-card-title">Checklisten</div>
+                    <div class="home-card-desc" id="home-cl-desc">10 Checklisten</div>
+                    <div class="home-cl-bar"><div class="home-cl-bar-fill" id="home-cl-bar" style="width:0%"></div></div>
+                </div>
+            </div>
+            <!-- Wartungsblatt -->
+            <div class="home-card" data-goto="maintenance">
+                <div class="home-card-icon">&#128203;</div>
+                <div>
+                    <div class="home-card-title">Wartungsblatt</div>
+                    <div class="home-card-desc" id="home-maint-desc">Flugdaten erfassen</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Archiv -->
+        <div class="home-card wide" data-goto="archive">
+            <div class="home-card-icon">&#128193;</div>
+            <div class="home-card-body">
+                <div class="home-card-title">Archiv</div>
+                <div class="home-card-desc" id="home-archive-desc">Vergangene Flüge</div>
+            </div>
+            <div class="home-card-arrow">&#8594;</div>
+        </div>
+    </div>
+
+    <button class="home-new-flight-btn" id="btn-home-new-flight">+ Neuer Flug starten</button>
+</div>
+
+<!-- ═══ APP SCREEN ═══ -->
+<div id="screen-app" class="hidden">
+    <nav id="sidebar">
+        <div id="sidebar-header">
+            <div id="sidebar-title">Boeing 737</div>
+            <div id="sidebar-sub">Normal Procedures</div>
+            <div id="sidebar-flight"></div>
+        </div>
+        <div id="checklist-nav"></div>
+    </nav>
+
+    <main id="main">
+        <div id="main-header">
+            <button id="btn-home" title="Home">&#8962;</button>
+            <button id="btn-menu">&#9776;</button>
+            <div id="header-title-wrap">
+                <div id="header-title">–</div>
+                <div id="header-sub"></div>
+            </div>
+            <button id="btn-header-action" title="Zurücksetzen">&#8635;</button>
+        </div>
+
+        <!-- Checklist View -->
+        <div id="view-checklist" class="view">
+            <div id="checklist-body"></div>
+            <div id="checklist-footer" class="hidden">
+                <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+                <button id="btn-complete">Checkliste abschliessen</button>
+            </div>
+        </div>
+
+        <!-- Wartungsblatt View -->
+        <div id="view-maintenance" class="view hidden">
+            <div class="maint-section">
+                <div class="maint-section-title">Flugdaten</div>
+                <div class="maint-row"><span class="maint-label">Flugnummer</span><input class="maint-input" data-field="flightNumber" readonly></div>
+                <div class="maint-row"><span class="maint-label">Datum</span><input class="maint-input" data-field="date" readonly></div>
+                <div class="maint-row"><span class="maint-label">Flugzeug (Reg.)</span><input class="maint-input" data-field="aircraft" placeholder="z.B. PH-HZD"></div>
+            </div>
+            <div class="maint-section">
+                <div class="maint-section-title">Strecke</div>
+                <div class="maint-row"><span class="maint-label">Abflughafen</span><input class="maint-input" data-field="depAirport" placeholder="ICAO / IATA" maxlength="4" style="text-transform:uppercase"></div>
+                <div class="maint-row"><span class="maint-label">Zielflughafen</span><input class="maint-input" data-field="arrAirport" placeholder="ICAO / IATA" maxlength="4" style="text-transform:uppercase"></div>
+            </div>
+            <div class="maint-section">
+                <div class="maint-section-title">Zeiten (UTC)</div>
+                <div class="maint-row"><span class="maint-label">STD</span><input class="maint-input" data-field="std" type="time"></div>
+                <div class="maint-row"><span class="maint-label">ATD</span><input class="maint-input" data-field="atd" type="time"></div>
+                <div class="maint-row"><span class="maint-label">STA</span><input class="maint-input" data-field="sta" type="time"></div>
+                <div class="maint-row"><span class="maint-label">ATA</span><input class="maint-input" data-field="ata" type="time"></div>
+                <div class="maint-row"><span class="maint-label">Flugzeit</span><input class="maint-input" data-field="flightTime" placeholder="z.B. 2:10"></div>
+                <div class="maint-row"><span class="maint-label">Blockzeit</span><input class="maint-input" data-field="blockTime" placeholder="z.B. 2:25"></div>
+            </div>
+            <div class="maint-section">
+                <div class="maint-section-title">Besatzung</div>
+                <div class="maint-row"><span class="maint-label">Captain</span><input class="maint-input" data-field="captain" placeholder="Name"></div>
+                <div class="maint-row"><span class="maint-label">First Officer</span><input class="maint-input" data-field="fo" placeholder="Name"></div>
+                <div class="maint-row"><span class="maint-label">Cabin Senior</span><input class="maint-input" data-field="cabinSenior" placeholder="Name"></div>
+            </div>
+            <div class="maint-section">
+                <div class="maint-section-title">Kraftstoff (kg)</div>
+                <div class="maint-row"><span class="maint-label">Geplant</span><input class="maint-input" data-field="fuelPlanned" type="number" placeholder="0" min="0"></div>
+                <div class="maint-row"><span class="maint-label">Block-Off</span><input class="maint-input" data-field="fuelDep" type="number" placeholder="0" min="0"></div>
+                <div class="maint-row"><span class="maint-label">Block-On</span><input class="maint-input" data-field="fuelArr" type="number" placeholder="0" min="0"></div>
+                <div class="maint-row"><span class="maint-label">Uplift</span><input class="maint-input" data-field="fuelUplift" type="number" placeholder="0" min="0"></div>
+            </div>
+            <div class="maint-section">
+                <div class="maint-section-title">Sonstiges</div>
+                <div class="maint-row"><span class="maint-label">Landungen</span><input class="maint-input" data-field="landings" type="number" placeholder="0" min="0"></div>
+                <div class="maint-row" style="align-items:flex-start"><span class="maint-label" style="padding-top:2px">Bemerkungen</span><textarea class="maint-textarea" data-field="remarks" placeholder="Technische Bemerkungen…"></textarea></div>
+            </div>
+            <div id="maint-saved">&#10003; Gespeichert</div>
+        </div>
+
+        <!-- Archiv View -->
+        <div id="view-archive" class="view hidden">
+            <div id="archive-list"></div>
+        </div>
+    </main>
+</div>
+
+<div id="sidebar-overlay"></div>
+
+<!-- Flight Modal -->
+<div id="flight-modal">
+    <div id="modal-box">
+        <div class="modal-eyebrow">Boeing 737 · Normal Procedures</div>
+        <div class="modal-title">Neuer Flug</div>
+        <div id="modal-continue-wrap" style="display:none">
+            <button id="modal-continue-btn">
+                <span>&#9992;</span>
+                <div><div id="modal-continue-fn"></div><div class="modal-continue-sub">Weiter mit diesem Flug</div></div>
+                <span class="modal-arrow">&#8594;</span>
+            </button>
+            <div class="modal-divider">oder neuen Flug starten</div>
+        </div>
+        <div class="modal-label">Flugnummer</div>
+        <input id="modal-input" placeholder="z.B. HV1234" maxlength="10" autocomplete="off">
+        <button id="modal-start-btn">Flug starten</button>
+    </div>
+</div>
+
+<script>
+// FOR TRAINING PURPOSES ONLY – NOT FOR OPERATIONAL USE
+
+const CHECKLISTS = [
+    { id: 'preflight', name: 'Preflight', phase: 'Ground', items: [
+        { id: 'pf1', challenge: 'OXYGEN',                    response: 'Tested, 100%' },
+        { id: 'pf2', challenge: 'NAV TRANSFER & DISPLAY SW', response: 'NORMAL, AUTO' },
+        { id: 'pf3', challenge: 'WINDOW HEAT',               response: 'ON' },
+        { id: 'pf4', challenge: 'PRESSURIZATION MODE SEL',   response: 'AUTO' },
+        { id: 'pf5', challenge: 'FLIGHT INSTRUMENTS',        response: 'Hdg ___, Altimeter ___' },
+        { id: 'pf6', challenge: 'PARKING BRAKE',             response: 'SET' },
+        { id: 'pf7', challenge: 'ENGINE START LEVERS',       response: 'CUTOFF' },
+    ]},
+    { id: 'before-start', name: 'Before Start', phase: 'Ground', items: [
+        { id: 'bs1',  challenge: 'RECALL',                    response: 'Checked' },
+        { id: 'bs2',  challenge: 'FLIGHT DECK DOOR',          response: 'Closed and locked' },
+        { id: 'bs3',  challenge: 'FUEL',                      response: '___ KGS, Pumps ON' },
+        { id: 'bs4',  challenge: 'PASSENGER SIGNS',           response: '___' },
+        { id: 'bs5',  challenge: 'WINDOWS',                   response: 'Locked' },
+        { id: 'bs6',  challenge: 'MCP',                       response: 'V2 ___, HDG ___, ALT ___' },
+        { id: 'bs7',  challenge: 'TAKEOFF SPEEDS',            response: 'V1 ___, VR ___, V2 ___' },
+        { id: 'bs8',  challenge: 'CDU PREFLIGHT',             response: 'Completed' },
+        { id: 'bs9',  challenge: 'RUDDER AND AILERON TRIM',   response: 'Free and 0' },
+        { id: 'bs10', challenge: 'ENGINE START SWITCHES',     response: 'CONT' },
+        { id: 'bs11', challenge: 'TAXI AND TAKEOFF BRIEFING', response: 'Completed' },
+        { id: 'bs12', challenge: 'ANTI COLLISION LIGHT',      response: 'ON' },
+    ]},
+    { id: 'before-taxi', name: 'Before Taxi', phase: 'Ground', items: [
+        { id: 'bt1',  challenge: 'GENERATORS',            response: 'On' },
+        { id: 'bt2',  challenge: 'PROBE HEAT',            response: 'ON' },
+        { id: 'bt3',  challenge: 'ANTI-ICE',              response: '___' },
+        { id: 'bt4',  challenge: 'ISOLATION VALVE',       response: 'AUTO' },
+        { id: 'bt5',  challenge: 'ENGINE START SWITCHES', response: 'CONT' },
+        { id: 'bt6',  challenge: 'RECALL',                response: 'Checked' },
+        { id: 'bt7',  challenge: 'AUTO BRAKE',            response: 'RTO' },
+        { id: 'bt8',  challenge: 'FLAPS',                 response: '___, Green light' },
+        { id: 'bt9',  challenge: 'ENGINE START LEVERS',   response: 'IDLE detent' },
+        { id: 'bt10', challenge: 'FLIGHT CONTROLS',       response: 'Checked' },
+        { id: 'bt11', challenge: 'GROUND EQUIPMENT',      response: 'Clear' },
+    ]},
+    { id: 'before-takeoff', name: 'Before Takeoff', phase: 'Takeoff', items: [
+        { id: 'bto1', challenge: 'FLAPS',           response: '___, Green light' },
+        { id: 'bto2', challenge: 'STABILIZER TRIM', response: '___ Units' },
+        { id: 'bto3', challenge: 'PROBE HEAT',      response: 'AUTO' },
+    ]},
+    { id: 'after-takeoff', name: 'After Takeoff', phase: 'Takeoff', items: [
+        { id: 'ato1', challenge: 'ENGINE BLEEDS', response: 'ON' },
+        { id: 'ato2', challenge: 'PACKS',         response: 'AUTO' },
+        { id: 'ato3', challenge: 'LANDING GEAR',  response: 'UP and OFF' },
+        { id: 'ato4', challenge: 'FLAPS',         response: 'UP, No lights' },
+    ]},
+    { id: 'descent', name: 'Descent', phase: 'Approach', items: [
+        { id: 'de1', challenge: 'PRESSURIZATION',   response: 'LAND ALT ___' },
+        { id: 'de2', challenge: 'AUTOBRAKE',         response: '___' },
+        { id: 'de3', challenge: 'LANDING DATA',      response: 'VREF ___, Minimums ___' },
+        { id: 'de4', challenge: 'APPROACH BRIEFING', response: 'Completed' },
+    ]},
+    { id: 'approach', name: 'Approach', phase: 'Approach', items: [
+        { id: 'ap1', challenge: 'ALTIMETERS', response: '___' },
+    ]},
+    { id: 'landing', name: 'Landing', phase: 'Approach', items: [
+        { id: 'la1', challenge: 'SPEEDBRAKE',   response: 'ARMED' },
+        { id: 'la2', challenge: 'LANDING GEAR', response: 'Down' },
+        { id: 'la3', challenge: 'FLAPS',        response: '___, Green light' },
+    ]},
+    { id: 'shutdown', name: 'Shutdown', phase: 'Arrival', items: [
+        { id: 'sd1', challenge: 'FUEL PUMPS',          response: 'OFF' },
+        { id: 'sd2', challenge: 'PROBE HEAT',          response: 'OFF' },
+        { id: 'sd3', challenge: 'HYDRAULIC PANEL',     response: 'Set' },
+        { id: 'sd4', challenge: 'FLAPS',               response: 'UP' },
+        { id: 'sd5', challenge: 'PARKING BRAKE',       response: '___' },
+        { id: 'sd6', challenge: 'ENGINE START LEVERS', response: 'CUTOFF' },
+        { id: 'sd7', challenge: 'WEATHER RADAR',       response: 'Off' },
+    ]},
+    { id: 'secure', name: 'Secure', phase: 'Arrival', items: [
+        { id: 'se1', challenge: 'IRSs',                  response: 'OFF' },
+        { id: 'se2', challenge: 'EMERGENCY EXIT LIGHTS', response: 'OFF' },
+        { id: 'se3', challenge: 'WINDOW HEAT',           response: 'OFF' },
+        { id: 'se4', challenge: 'PACKS',                 response: 'OFF' },
+    ]},
+];
+
+// ─── State ─────────────────────────────────────────────
+const ARCHIVE_KEY = '737archive_v1';
+var archive = { flights: [], currentFlightId: null };
+var currentFlight = null;
+var state = {};
+var currentId = null;
+var currentView = 'checklist';
+var sidebarOpen = false;
+
+// ─── Archive ───────────────────────────────────────────
+function loadArchive() {
+    try { archive = JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || { flights: [], currentFlightId: null }; }
+    catch(e) { archive = { flights: [], currentFlightId: null }; }
+    if (!archive.flights) archive.flights = [];
+}
+
+function saveArchive() {
+    if (currentFlight) { currentFlight.checklists = state; archive.currentFlightId = currentFlight.id; }
+    try { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archive)); } catch(e) {}
+}
+
+function findFlight(id) {
+    for (var i = 0; i < archive.flights.length; i++) { if (archive.flights[i].id === id) return archive.flights[i]; }
+    return null;
+}
+
+function initState() {
+    CHECKLISTS.forEach(function(cl) {
+        if (!state[cl.id]) state[cl.id] = { completed: false, items: {} };
+    });
+}
+
+function clProgress() {
+    var done = 0, total = CHECKLISTS.length;
+    CHECKLISTS.forEach(function(cl) { if (state[cl.id] && state[cl.id].completed) done++; });
+    return { done: done, total: total };
+}
+
+// ─── Flight start/resume ───────────────────────────────
+function startNewFlight(fn) {
+    currentFlight = {
+        id: Date.now().toString(), flightNumber: fn.toUpperCase(),
+        date: new Date().toISOString().split('T')[0],
+        aircraft: '', depAirport: '', arrAirport: '',
+        std: '', atd: '', sta: '', ata: '', flightTime: '', blockTime: '',
+        captain: '', fo: '', cabinSenior: '',
+        fuelPlanned: '', fuelDep: '', fuelArr: '', fuelUplift: '',
+        landings: '', remarks: '', checklists: {}
+    };
+    archive.flights.push(currentFlight);
+    state = currentFlight.checklists;
+    initState();
+    saveArchive();
+    hideModal();
+    showHome();
+}
+
+function resumeFlight(f) {
+    currentFlight = f; state = currentFlight.checklists; initState();
+    hideModal(); showHome();
+}
+
+// ─── Modal ─────────────────────────────────────────────
+function showModal() {
+    var wrap = document.getElementById('modal-continue-wrap');
+    var f = archive.currentFlightId ? findFlight(archive.currentFlightId) : null;
+    if (f) { document.getElementById('modal-continue-fn').textContent = f.flightNumber; wrap.style.display = 'block'; }
+    else { wrap.style.display = 'none'; }
+    document.getElementById('modal-input').value = '';
+    document.getElementById('flight-modal').classList.add('visible');
+    setTimeout(function() { document.getElementById('modal-input').focus(); }, 150);
+}
+function hideModal() { document.getElementById('flight-modal').classList.remove('visible'); }
+
+// ─── Home Screen ───────────────────────────────────────
+function showHome() {
+    document.getElementById('screen-home').classList.remove('hidden');
+    document.getElementById('screen-app').classList.add('hidden');
+    updateHomeScreen();
+}
+
+function updateHomeScreen() {
+    var hasFlight = !!currentFlight;
+    document.getElementById('home-flight-card').classList.toggle('hidden', !hasFlight);
+    document.getElementById('home-no-flight').classList.toggle('hidden', hasFlight);
+
+    if (hasFlight) {
+        document.getElementById('home-fn').textContent = currentFlight.flightNumber;
+        var meta = [];
+        if (currentFlight.aircraft) meta.push(currentFlight.aircraft);
+        if (currentFlight.depAirport || currentFlight.arrAirport)
+            meta.push((currentFlight.depAirport || '?') + ' \u2192 ' + (currentFlight.arrAirport || '?'));
+        document.getElementById('home-meta').textContent = meta.join(' \u00b7 ') || fmtDate(currentFlight.date);
+
+        var p = clProgress();
+        document.getElementById('home-progress').textContent = p.done + ' / ' + p.total + ' Checklisten abgeschlossen';
+        document.getElementById('home-cl-desc').textContent = p.done + ' / ' + p.total + ' abgeschlossen';
+        var pct = p.total > 0 ? Math.round(p.done / p.total * 100) : 0;
+        var bar = document.getElementById('home-cl-bar');
+        bar.style.width = pct + '%';
+        bar.classList.toggle('done', p.done === p.total);
+
+        var mDesc = [];
+        if (currentFlight.depAirport) mDesc.push(currentFlight.depAirport + ' \u2192 ' + (currentFlight.arrAirport || '?'));
+        if (currentFlight.aircraft) mDesc.push(currentFlight.aircraft);
+        document.getElementById('home-maint-desc').textContent = mDesc.join(' \u00b7 ') || 'Flugdaten erfassen';
+    }
+
+    document.getElementById('home-archive-desc').textContent = archive.flights.length + ' Fl\u00fcge gespeichert';
+}
+
+// ─── App Screen ────────────────────────────────────────
+function showApp(view) {
+    document.getElementById('screen-home').classList.add('hidden');
+    document.getElementById('screen-app').classList.remove('hidden');
+    setView(view);
+    // Update sidebar flight label
+    document.getElementById('sidebar-flight').textContent = currentFlight ? '\u9992 ' + currentFlight.flightNumber : '';
+}
+
+function setView(view) {
+    currentView = view;
+    document.getElementById('view-checklist').classList.toggle('hidden', view !== 'checklist');
+    document.getElementById('view-maintenance').classList.toggle('hidden', view !== 'maintenance');
+    document.getElementById('view-archive').classList.toggle('hidden', view !== 'archive');
+
+    // Sidebar only shown for checklist
+    var sidebar = document.getElementById('sidebar');
+    if (view === 'checklist') {
+        sidebar.style.display = '';
+    } else {
+        sidebar.style.display = 'none';
+        if (sidebarOpen) closeSidebar();
+    }
+    document.getElementById('btn-menu').style.display = view === 'checklist' ? '' : 'none';
+
+    var action = document.getElementById('btn-header-action');
+    if (view === 'checklist') {
+        action.classList.remove('hidden');
+        if (currentId) { renderNav(); renderChecklist(); }
+        else { renderNav(); openChecklist(CHECKLISTS[0].id); }
+    } else if (view === 'maintenance') {
+        action.classList.add('hidden');
+        document.getElementById('header-title').textContent = 'Wartungsblatt';
+        document.getElementById('header-sub').textContent = currentFlight ? currentFlight.flightNumber : '';
+        renderMaintenance();
+    } else if (view === 'archive') {
+        action.classList.add('hidden');
+        document.getElementById('header-title').textContent = 'Archiv';
+        document.getElementById('header-sub').textContent = archive.flights.length + ' Fl\u00fcge';
+        renderArchive();
+    }
+}
+
+// ─── Checklist Nav ─────────────────────────────────────
+function renderNav() {
+    var nav = document.getElementById('checklist-nav');
+    var phases = [];
+    CHECKLISTS.forEach(function(cl) { if (phases.indexOf(cl.phase) < 0) phases.push(cl.phase); });
+    nav.innerHTML = phases.map(function(phase) {
+        var lists = CHECKLISTS.filter(function(cl) { return cl.phase === phase; });
+        return '<div class="phase-group"><div class="phase-label">' + phase + '</div>'
+            + lists.map(function(cl) {
+                var s = state[cl.id] || { completed: false, items: {} };
+                var done = s.completed, count = cl.items.length;
+                var checked = Object.values(s.items).filter(Boolean).length;
+                var pct = count > 0 ? Math.round(checked / count * 100) : 0;
+                var active = cl.id === currentId;
+                return '<button class="nav-item' + (active ? ' active' : '') + (done ? ' done' : '') + '" data-cl-id="' + cl.id + '">'
+                    + '<span class="nav-status">' + (done ? '\u2713' : (checked > 0 ? checked + '/' + count : '')) + '</span>'
+                    + '<span class="nav-name">' + cl.name + '</span>'
+                    + (!done && pct > 0 ? '<div class="nav-progress"><div style="width:' + pct + '%"></div></div>' : '')
+                    + '</button>';
+            }).join('') + '</div>';
+    }).join('');
+}
+
+function openChecklist(id) {
+    currentId = id;
+    renderNav(); renderChecklist();
+    if (window.innerWidth < 900) closeSidebar();
+}
+
+// ─── Checklist Render ──────────────────────────────────
+function renderChecklist() {
+    if (!currentId) return;
+    var cl = null;
+    for (var i = 0; i < CHECKLISTS.length; i++) { if (CHECKLISTS[i].id === currentId) { cl = CHECKLISTS[i]; break; } }
+    if (!cl) return;
+    var s = state[currentId];
+    var checked = Object.values(s.items).filter(Boolean).length;
+    var total = cl.items.length;
+
+    document.getElementById('header-title').textContent = cl.name;
+    document.getElementById('header-sub').textContent = s.completed ? 'Abgeschlossen \u2713' : checked + ' / ' + total;
+
+    var body = document.getElementById('checklist-body');
+    var html = '';
+    for (var j = 0; j < total; j++) {
+        var item = cl.items[j], done = !!s.items[item.id];
+        html += '<div class="cl-item' + (done ? ' checked' : '') + (s.completed ? ' locked' : '') + '" data-item-id="' + item.id + '">'
+            + '<div class="cl-checkbox' + (done ? ' checked' : '') + '">'
+            + (done ? '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+            + '</div><div class="cl-texts"><span class="cl-challenge">' + item.challenge + '</span>'
+            + '<span class="cl-response">' + item.response + '</span></div></div>';
+    }
+    body.innerHTML = html;
+
+    var footer = document.getElementById('checklist-footer');
+    if (s.completed) {
+        footer.classList.add('hidden');
+        var ov = document.createElement('div'); ov.id = 'completed-overlay';
+        ov.innerHTML = '<div class="completed-badge"><div class="completed-check">\u2713</div>'
+            + '<div class="completed-title">' + cl.name + '</div><div class="completed-sub">Complete</div></div>';
+        body.appendChild(ov);
+    } else {
+        footer.classList.remove('hidden');
+        document.getElementById('progress-bar').style.width = (total > 0 ? checked / total * 100 : 0) + '%';
+        var btn = document.getElementById('btn-complete');
+        btn.disabled = checked < total;
+        btn.classList.toggle('ready', checked === total);
+    }
+}
+
+function toggleItem(itemId) {
+    if (!currentId || state[currentId].completed) return;
+    state[currentId].items[itemId] = !state[currentId].items[itemId];
+    saveArchive(); renderChecklist(); renderNav();
+}
+
+function completeChecklist() {
+    if (!currentId) return;
+    var cl = null;
+    for (var i = 0; i < CHECKLISTS.length; i++) { if (CHECKLISTS[i].id === currentId) { cl = CHECKLISTS[i]; break; } }
+    if (!cl) return;
+    var s = state[currentId];
+    if (Object.values(s.items).filter(Boolean).length < cl.items.length) return;
+    s.completed = true; saveArchive(); renderNav(); renderChecklist();
+}
+
+function resetCurrent() {
+    if (!currentId) return;
+    state[currentId] = { completed: false, items: {} };
+    saveArchive(); renderNav(); renderChecklist();
+}
+
+function resetAll() {
+    if (!confirm('Alle Checklisten dieses Fluges zur\u00fccksetzen?')) return;
+    CHECKLISTS.forEach(function(cl) { state[cl.id] = { completed: false, items: {} }; });
+    saveArchive(); renderNav(); if (currentId) renderChecklist();
+}
+
+// ─── Maintenance ───────────────────────────────────────
+function renderMaintenance() {
+    if (!currentFlight) return;
+    document.querySelectorAll('#view-maintenance [data-field]').forEach(function(el) {
+        el.value = currentFlight[el.getAttribute('data-field')] || '';
+    });
+}
+
+var _mt = null;
+document.getElementById('view-maintenance').addEventListener('input', function(e) {
+    var field = e.target.getAttribute('data-field');
+    if (!field || !currentFlight || e.target.hasAttribute('readonly')) return;
+    currentFlight[field] = e.target.value;
+    clearTimeout(_mt);
+    _mt = setTimeout(function() {
+        saveArchive();
+        var s = document.getElementById('maint-saved'); s.classList.add('show');
+        setTimeout(function() { s.classList.remove('show'); }, 1500);
+    }, 400);
+});
+
+// ─── Archive ───────────────────────────────────────────
+function fmtDate(d) {
+    if (!d) return '–'; var p = d.split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : d;
+}
+
+function renderArchive() {
+    var el = document.getElementById('archive-list');
+    if (!archive.flights.length) {
+        el.innerHTML = '<div class="archive-empty">Noch keine Fl\u00fcge gespeichert.<br>Starte einen neuen Flug um ihn hier zu sehen.</div>';
+        return;
+    }
+    var html = '';
+    archive.flights.slice().reverse().forEach(function(f) {
+        var isCur = currentFlight && f.id === currentFlight.id;
+        var done = 0;
+        CHECKLISTS.forEach(function(cl) { if (f.checklists[cl.id] && f.checklists[cl.id].completed) done++; });
+        html += '<div class="archive-card' + (isCur ? ' is-current' : '') + '" data-fid="' + f.id + '">'
+            + '<div class="archive-card-top">'
+            + '<div class="archive-row1"><span class="archive-fn">' + f.flightNumber + '</span>'
+            + (isCur ? '<span class="archive-cur-badge">Aktuell</span>' : '')
+            + '<span class="archive-date">' + fmtDate(f.date) + '</span></div>'
+            + '<div class="archive-row2">'
+            + (f.aircraft ? '<span>\u2708 ' + f.aircraft + '</span>' : '')
+            + '<span>' + (f.depAirport || '?') + ' \u2192 ' + (f.arrAirport || '?') + '</span>'
+            + (f.captain ? '<span>' + f.captain + '</span>' : '') + '</div>'
+            + '<div class="archive-row3">' + done + '/' + CHECKLISTS.length + ' Checklisten abgeschlossen</div>'
+            + '</div>'
+            + '<div class="archive-detail" id="ad-' + f.id + '">' + archiveDetailHTML(f, isCur) + '</div>'
+            + '</div>';
+    });
+    el.innerHTML = html;
+}
+
+function archiveDetailHTML(f, isCur) {
+    var rows = [
+        ['Flugzeug', f.aircraft], ['ATD', f.atd || f.std], ['ATA', f.ata || f.sta],
+        ['Flugzeit', f.flightTime], ['Blockzeit', f.blockTime],
+        ['Captain', f.captain], ['First Officer', f.fo],
+        ['Fuel geplant', f.fuelPlanned ? f.fuelPlanned + ' kg' : ''],
+        ['Fuel Block-Off', f.fuelDep ? f.fuelDep + ' kg' : ''],
+        ['Fuel Block-On', f.fuelArr ? f.fuelArr + ' kg' : ''],
+        ['Landungen', f.landings],
+    ];
+    var html = '<div class="archive-detail-grid">';
+    rows.forEach(function(r) {
+        if (r[1]) html += '<div class="archive-detail-cell"><span class="archive-detail-label">' + r[0] + '</span><span class="archive-detail-val">' + r[1] + '</span></div>';
+    });
+    html += '</div>';
+    if (f.remarks) html += '<div class="archive-remarks"><div class="archive-remarks-lbl">Bemerkungen</div>' + f.remarks + '</div>';
+    if (!isCur) html += '<button class="archive-delete-btn" data-del="' + f.id + '">Flug l\u00f6schen</button>';
+    return html;
+}
+
+function deleteFlight(id) {
+    if (!confirm('Flug aus dem Archiv l\u00f6schen?')) return;
+    archive.flights = archive.flights.filter(function(f) { return f.id !== id; });
+    if (archive.currentFlightId === id) archive.currentFlightId = null;
+    saveArchive(); renderArchive();
+    document.getElementById('header-sub').textContent = archive.flights.length + ' Fl\u00fcge';
+}
+
+// ─── Sidebar ───────────────────────────────────────────
+function toggleSidebar() { sidebarOpen ? closeSidebar() : openSidebar(); }
+function openSidebar() { sidebarOpen = true; document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('visible'); }
+function closeSidebar() { sidebarOpen = false; document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('visible'); }
+
+// ─── Init ──────────────────────────────────────────────
+loadArchive();
+if (archive.currentFlightId) {
+    var rf = findFlight(archive.currentFlightId);
+    if (rf) { resumeFlight(rf); } else { showModal(); }
+} else { showModal(); }
+
+// ─── Events ────────────────────────────────────────────
+// Home: nav cards
+document.getElementById('screen-home').addEventListener('click', function(e) {
+    var card = e.target.closest('[data-goto]');
+    if (card) { if (currentFlight) showApp(card.getAttribute('data-goto')); else showModal(); }
+});
+document.getElementById('btn-home-new-flight').addEventListener('click', showModal);
+
+// App: header buttons
+document.getElementById('btn-home').addEventListener('click', function() { showHome(); });
+document.getElementById('btn-header-action').addEventListener('click', resetCurrent);
+document.getElementById('btn-menu').addEventListener('click', toggleSidebar);
+document.getElementById('sidebar-overlay').addEventListener('click', toggleSidebar);
+
+// Checklist nav
+document.getElementById('checklist-nav').addEventListener('click', function(e) {
+    var b = e.target.closest('[data-cl-id]'); if (b) openChecklist(b.getAttribute('data-cl-id'));
+});
+document.getElementById('checklist-body').addEventListener('click', function(e) {
+    var it = e.target.closest('[data-item-id]'); if (it) toggleItem(it.getAttribute('data-item-id'));
+});
+document.getElementById('btn-complete').addEventListener('click', completeChecklist);
+
+// Archive
+document.getElementById('archive-list').addEventListener('click', function(e) {
+    var del = e.target.closest('[data-del]');
+    if (del) { deleteFlight(del.getAttribute('data-del')); return; }
+    var card = e.target.closest('[data-fid]');
+    if (card) { var d = document.getElementById('ad-' + card.getAttribute('data-fid')); if (d) d.classList.toggle('open'); }
+});
+
+// Modal
+document.getElementById('modal-start-btn').addEventListener('click', function() {
+    var v = document.getElementById('modal-input').value.trim(); if (v) startNewFlight(v); else document.getElementById('modal-input').focus();
+});
+document.getElementById('modal-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { var v = this.value.trim(); if (v) startNewFlight(v); }
+});
+document.getElementById('modal-continue-btn').addEventListener('click', function() {
+    var f = findFlight(archive.currentFlightId); if (f) resumeFlight(f);
+});
+</script>
+</body>
+</html>
